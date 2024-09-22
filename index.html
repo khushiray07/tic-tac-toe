@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fun Tic Tac Toe with History</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #f06, #9f6);
+            padding: 10px;
+        }
+        .game-container {
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            max-width: 100%;
+            width: 350px;
+        }
+        h1 {
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            font-size: 1.5em;
+            margin-top: 0;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+            margin-bottom: 15px;
+        }
+        .cell {
+            aspect-ratio: 1 / 1;
+            background-color: #fff;
+            border: 2px solid #333;
+            border-radius: 10px;
+            font-size: 2em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .cell:hover {
+            background-color: #f0f0f0;
+        }
+        .cell.x { color: #f06; }
+        .cell.o { color: #06f; }
+        #status {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+        button {
+            font-size: 1em;
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        @keyframes win-animation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .win {
+            animation: win-animation 0.5s ease infinite;
+        }
+        #player-form {
+            margin-bottom: 15px;
+        }
+        input {
+            font-size: 0.9em;
+            padding: 5px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            width: calc(50% - 10px);
+        }
+        #history {
+            margin-top: 15px;
+            text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #history h3 {
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+        #history p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Fun Tic Tac Toe!</h1>
+        <div id="player-form">
+            <input type="text" id="player-x" placeholder="Player X Name">
+            <input type="text" id="player-o" placeholder="Player O Name">
+            <button id="start-game">Start Game</button>
+        </div>
+        <div id="game" style="display: none;">
+            <div id="status">Player X's turn</div>
+            <div class="board" id="board">
+                <div class="cell" data-cell-index="0"></div>
+                <div class="cell" data-cell-index="1"></div>
+                <div class="cell" data-cell-index="2"></div>
+                <div class="cell" data-cell-index="3"></div>
+                <div class="cell" data-cell-index="4"></div>
+                <div class="cell" data-cell-index="5"></div>
+                <div class="cell" data-cell-index="6"></div>
+                <div class="cell" data-cell-index="7"></div>
+                <div class="cell" data-cell-index="8"></div>
+            </div>
+            <button id="reset">New Game</button>
+        </div>
+        <div id="history">
+            <h3>Match History</h3>
+        </div>
+    </div>
+
+    <script>
+        const statusDisplay = document.getElementById('status');
+        const cells = document.querySelectorAll('.cell');
+        const resetButton = document.getElementById('reset');
+        const startButton = document.getElementById('start-game');
+        const playerForm = document.getElementById('player-form');
+        const gameDiv = document.getElementById('game');
+        const historyDiv = document.getElementById('history');
+
+        let gameActive = false;
+        let currentPlayer = "X";
+        let gameState = ["", "", "", "", "", "", "", "", ""];
+        let players = { X: "Player X", O: "Player O" };
+        let matchHistory = [];
+
+        const winningConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ];
+
+        function startGame() {
+            players.X = document.getElementById('player-x').value || "Player X";
+            players.O = document.getElementById('player-o').value || "Player O";
+            playerForm.style.display = 'none';
+            gameDiv.style.display = 'block';
+            gameActive = true;
+            updateStatus();
+        }
+
+        function handleCellClick(clickedCellEvent) {
+            const clickedCell = clickedCellEvent.target;
+            const clickedCellIndex = parseInt(clickedCell.getAttribute('data-cell-index'));
+
+            if (gameState[clickedCellIndex] !== "" || !gameActive) {
+                return;
+            }
+
+            handleCellPlayed(clickedCell, clickedCellIndex);
+            handleResultValidation();
+        }
+
+        function handleCellPlayed(clickedCell, clickedCellIndex) {
+            gameState[clickedCellIndex] = currentPlayer;
+            clickedCell.textContent = currentPlayer;
+            clickedCell.classList.add(currentPlayer.toLowerCase());
+        }
+
+        function handleResultValidation() {
+            let roundWon = false;
+            for (let i = 0; i < winningConditions.length; i++) {
+                const [a, b, c] = winningConditions[i];
+                if (gameState[a] && gameState[a] === gameState[b] && gameState[a] === gameState[c]) {
+                    roundWon = true;
+                    cells[a].classList.add('win');
+                    cells[b].classList.add('win');
+                    cells[c].classList.add('win');
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                statusDisplay.textContent = `${players[currentPlayer]} wins! 🎉`;
+                gameActive = false;
+                saveMatchResult(`${players[currentPlayer]} won`);
+                return;
+            }
+
+            const roundDraw = !gameState.includes("");
+            if (roundDraw) {
+                statusDisplay.textContent = "It's a draw! 😅";
+                gameActive = false;
+                saveMatchResult("Draw");
+                return;
+            }
+
+            currentPlayer = currentPlayer === "X" ? "O" : "X";
+            updateStatus();
+        }
+
+        function updateStatus() {
+            statusDisplay.textContent = `${players[currentPlayer]}'s turn`;
+        }
+
+        function handleReset() {
+            gameActive = true;
+            currentPlayer = "X";
+            gameState = ["", "", "", "", "", "", "", "", ""];
+            updateStatus();
+            cells.forEach(cell => {
+                cell.textContent = "";
+                cell.classList.remove('x', 'o', 'win');
+            });
+        }
+
+        function saveMatchResult(result) {
+            const matchDate = new Date().toLocaleString();
+            matchHistory.unshift(`${matchDate}: ${players.X} vs ${players.O} - ${result}`);
+            updateHistoryDisplay();
+        }
+
+        function updateHistoryDisplay() {
+            historyDiv.innerHTML = '<h3>Match History</h3>';
+            matchHistory.forEach(match => {
+                const p = document.createElement('p');
+                p.textContent = match;
+                historyDiv.appendChild(p);
+            });
+        }
+
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+        resetButton.addEventListener('click', handleReset);
+        startButton.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
